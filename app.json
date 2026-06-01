@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "Chatrix",
+    "slug": "chatrix",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "chatrix",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F0F23"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.chatrix.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Chatrix uses your camera to capture photos for your profile and messages.",
+        "NSMicrophoneUsageDescription": "Chatrix uses your microphone to record voice notes.",
+        "NSPhotoLibraryUsageDescription": "Chatrix uses your photo library to upload images.",
+        "NSPhotoLibraryAddUsageDescription": "Chatrix saves media to your photo library."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0F0F23"
+      },
+      "package": "com.chatrix.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#6C63FF",
+          "sounds": ["./assets/sounds/notification.wav"]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Chatrix to access your photos.",
+          "cameraPermission": "Allow Chatrix to use your camera."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Chatrix to access your microphone for voice notes."
+        }
+      ]
+    ],
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    }
+  }
+}

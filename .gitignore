@@ -1,0 +1,74 @@
+# ============================================
+# Chatrix .gitignore
+# ============================================
+
+# --- Secrets / env (NEVER commit these) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist
+
+# --- Dependencies ---
+node_modules/
+.pnp
+.pnp.js
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+
+# --- Expo ---
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# --- Native builds ---
+ios/
+android/
+*.ipa
+*.apk
+*.aab
+
+# --- EAS ---
+.easignore
+
+# --- Metro ---
+.metro-health-check*
+
+# --- Logs ---
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+logs/
+
+# --- Testing / coverage ---
+coverage/
+
+# --- TypeScript ---
+*.tsbuildinfo
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Editors / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Temp ---
+*.orig
+.tmp/
+tmp/
+
+# --- Supabase local (keep migrations & functions, ignore local state) ---
+supabase/.branches/
+supabase/.temp/
+supabase/.env
