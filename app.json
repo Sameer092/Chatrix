@@ -39,7 +39,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -49,7 +49,9 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#6C63FF",
-          "sounds": ["./assets/sounds/notification.wav"]
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
         }
       ],
       [
@@ -64,7 +66,9 @@
         {
           "microphonePermission": "Allow Chatrix to access your microphone for voice notes."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-asset"
     ],
     "extra": {
       "supabaseUrl": "",
