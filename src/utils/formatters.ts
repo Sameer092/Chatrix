@@ -36,15 +36,25 @@ export function formatDuration(seconds: number): string {
  * last_seen is recent (within 90s). This prevents a stale is_online=true
  * (e.g. after a force-quit) from showing someone online for hours.
  */
+/**
+ * True only if the user is flagged online AND was seen recently (within 90s).
+ * A stale is_online=true (e.g. after a force-quit) is treated as offline.
+ * Use this for the green presence dot everywhere so it stays consistent.
+ */
+export function isUserOnline(
+  isOnline: boolean | undefined,
+  lastSeen: string | null | undefined
+): boolean {
+  if (!isOnline) return false;
+  if (!lastSeen) return true;
+  return (Date.now() - new Date(lastSeen).getTime()) / 1000 < 90;
+}
+
 export function formatPresence(
   isOnline: boolean | undefined,
   lastSeen: string | null | undefined
 ): { text: string; online: boolean } {
-  if (!lastSeen) {
-    return { text: isOnline ? 'Online' : 'Offline', online: !!isOnline };
-  }
-  const secondsAgo = (Date.now() - new Date(lastSeen).getTime()) / 1000;
-  const reallyOnline = !!isOnline && secondsAgo < 90;
-  if (reallyOnline) return { text: 'Online', online: true };
-  return { text: `Last seen ${formatDistanceToNow(lastSeen)}`, online: false };
+  if (isUserOnline(isOnline, lastSeen)) return { text: 'Online', online: true };
+  if (lastSeen) return { text: `Last seen ${formatDistanceToNow(lastSeen)}`, online: false };
+  return { text: 'Offline', online: false };
 }

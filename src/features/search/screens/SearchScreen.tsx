@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 
 import { profileService } from '../../../services/profile.service';
+import { isUserOnline } from '../../../utils/formatters';
 import { useThemeStore } from '../../../store/themeStore';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { Avatar } from '../../../components/ui/Avatar';
@@ -46,7 +47,7 @@ export default function SearchScreen() {
       onPress={() => navigation.navigate('UserProfile', { userId: item.id })}
       activeOpacity={0.7}
     >
-      <Avatar uri={item.avatar_url} name={item.name} size={50} isOnline={item.is_online} />
+      <Avatar uri={item.avatar_url} name={item.name} size={50} isOnline={isUserOnline(item.is_online, item.last_seen)} />
       <View style={styles.userInfo}>
         <Text style={[styles.name, { color: textColor }]}>{item.name}</Text>
         <Text style={[styles.username, { color: subtextColor }]}>@{item.username}</Text>

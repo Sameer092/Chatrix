@@ -6,8 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Text,
+  TextInput,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -20,6 +22,8 @@ import { useThemeStore } from '../../../store/themeStore';
 import { MessageInput } from '../../chat/components/MessageInput';
 import { MessageBubble } from '../../chat/components/MessageBubble';
 import { Avatar } from '../../../components/ui/Avatar';
+import { encodeReply, decodeReply, messageSnippet } from '../../chat/replyMessage';
+import { decodeSharedPost } from '../../feed/sharedPost';
 import type { GroupMessage, Message } from '../../../types';
 import type { RootRouteProp, RootNavProp } from '../../../types/navigation.types';
 
@@ -33,6 +37,9 @@ export default function GroupChatScreen() {
   const { groupId, groupName, avatar } = route.params;
   const flatListRef = useRef<FlatList>(null);
   const [localMessages, setLocalMessages] = useState<GroupMessage[]>([]);
+  const [replyingTo, setReplyingTo] = useState<{ sender: string; snippet: string } | null>(null);
+  const [editingMsg, setEditingMsg] = useState<GroupMessage | null>(null);
+  const [editText, setEditText] = useState('');
 
   const handleMenu = () => {
     Alert.alert(groupName, undefined, [
@@ -76,7 +83,12 @@ export default function GroupChatScreen() {
     refetchOnMount: 'always',
   });
 
-  const messages = [...(data?.pages.flat() ?? []), ...localMessages];
+  // De-duplicate by id (a sent/refetched message can appear in both lists).
+  const mergedById = new Map<string, GroupMessage>();
+  for (const m of data?.pages.flat() ?? []) mergedById.set(m.id, m);
+  for (const m of localMessages) mergedById.set(m.id, m);
+  const messages = Array.from(mergedById.values());
+  const invertedData = [...messages].reverse();
 
   useEffect(() => {
     const channel = groupService.subscribeToGroupMessages(groupId, (msg) => {
@@ -110,31 +122,91 @@ export default function GroupChatScreen() {
     },
   });
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [messages.length]);
-
   const bgColor = isDark ? '#0F0F23' : '#F8F9FA';
   const textColor = isDark ? '#FFFFFF' : '#1E293B';
+  const subtextColor = isDark ? '#94A3B8' : '#64748B';
   const headerBg = isDark ? '#1A1A3E' : '#FFFFFF';
+
+  const { mutate: deleteMsg } = useMutation({
+    mutationFn: (id: string) => groupService.deleteGroupMessage(id),
+    onSuccess: (_d, id) => {
+      setLocalMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, is_deleted: true, content: null } : m))
+      );
+      queryClient.invalidateQueries({ queryKey: ['group-messages', groupId] });
+    },
+    onError: () => Alert.alert('Error', 'Could not delete the message.'),
+  });
+
+  const { mutate: editMsg, isPending: savingEdit } = useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) =>
+      groupService.editGroupMessage(id, content),
+    onSuccess: (_d, { id, content }) => {
+      setLocalMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)));
+      queryClient.invalidateQueries({ queryKey: ['group-messages', groupId] });
+      setEditingMsg(null);
+    },
+    onError: () => Alert.alert('Error', 'Could not edit the message.'),
+  });
+
+  const handleLongPress = (message: GroupMessage) => {
+    if (message.is_deleted) return;
+    const isMine = message.sender_id === currentUser?.id;
+    const isPlainText =
+      message.message_type === 'text' &&
+      !decodeSharedPost(message.content) &&
+      !decodeReply(message.content);
+
+    const options: any[] = [
+      {
+        text: 'Reply',
+        onPress: () =>
+          setReplyingTo({
+            sender: isMine ? 'yourself' : message.sender?.name ?? 'user',
+            snippet: messageSnippet(message),
+          }),
+      },
+    ];
+    if (isMine && isPlainText) {
+      options.push({
+        text: 'Edit',
+        onPress: () => {
+          setEditText(message.content ?? '');
+          setEditingMsg(message);
+        },
+      });
+    }
+    if (isMine) {
+      options.push({
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert('Delete message', 'Delete this message?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => deleteMsg(message.id) },
+          ]),
+      });
+    }
+    options.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Message', undefined, options);
+  };
 
   const renderMessage = useCallback(
     ({ item, index }: { item: GroupMessage; index: number }) => {
       const isMe = item.sender_id === currentUser?.id;
-      const prev = messages[index - 1];
-      const showAvatar = !isMe && (!prev || prev.sender_id !== item.sender_id);
+      const older = invertedData[index + 1];
+      const showAvatar = !isMe && (!older || older.sender_id !== item.sender_id);
       return (
         <MessageBubble
           message={item as unknown as Message}
           isMe={isMe}
           showAvatar={showAvatar}
           showSenderName={!isMe}
+          onLongPress={() => handleLongPress(item)}
         />
       );
     },
-    [currentUser?.id, messages]
+    [currentUser?.id, invertedData]
   );
 
   return (
@@ -164,31 +236,78 @@ export default function GroupChatScreen() {
 
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={invertedData}
+        inverted
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         onEndReached={() => hasNextPage && fetchNextPage()}
         onEndReachedThreshold={0.2}
-        contentContainerStyle={[styles.messagesList, { paddingBottom: 16 }]}
+        contentContainerStyle={[styles.messagesList, { paddingTop: 16 }]}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
+      {replyingTo && (
+        <View style={[styles.replyBar, { backgroundColor: headerBg, borderTopColor: subtextColor }]}>
+          <View style={styles.replyBarAccent} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.replyBarTitle}>Replying to {replyingTo.sender}</Text>
+            <Text style={[styles.replyBarSnippet, { color: subtextColor }]} numberOfLines={1}>
+              {replyingTo.snippet}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={20} color={subtextColor} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <MessageInput
-        onSend={(content, type, fileData) =>
+        onSend={(content, type, fileData) => {
+          const finalContent =
+            type === 'text' && replyingTo && content
+              ? encodeReply(content, replyingTo.sender, replyingTo.snippet)
+              : content;
           sendMessage({
-            content,
+            content: finalContent,
             messageType: type,
             fileUrl: fileData?.url,
             fileName: fileData?.name,
             fileSize: fileData?.size,
             duration: fileData?.duration,
-          })
-        }
+          });
+          setReplyingTo(null);
+        }}
         onTypingChange={() => {}}
         conversationId={groupId}
       />
+
+      {/* Edit message */}
+      <Modal visible={!!editingMsg} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditingMsg(null)}>
+        <View style={[styles.container, { backgroundColor: bgColor }]}>
+          <View style={[styles.header, { paddingTop: 16, backgroundColor: headerBg }]}>
+            <TouchableOpacity onPress={() => setEditingMsg(null)}>
+              <Text style={{ color: subtextColor, fontSize: 16 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.headerName, { color: textColor, flex: 1, textAlign: 'center' }]}>Edit Message</Text>
+            <TouchableOpacity
+              onPress={() => editingMsg && editText.trim() && editMsg({ id: editingMsg.id, content: editText.trim() })}
+              disabled={savingEdit}
+            >
+              <Text style={{ color: '#6C63FF', fontSize: 16, fontWeight: '700', opacity: savingEdit ? 0.5 : 1 }}>
+                {savingEdit ? 'Saving…' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={{ color: textColor, fontSize: 17, padding: 20, minHeight: 120, textAlignVertical: 'top' }}
+            value={editText}
+            onChangeText={setEditText}
+            multiline
+            autoFocus
+            maxLength={1000}
+          />
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -211,6 +330,17 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
   headerBtn: { padding: 6 },
   messagesList: { paddingHorizontal: 16, paddingTop: 12 },
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 0.5,
+    gap: 10,
+  },
+  replyBarAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#6C63FF', borderRadius: 2 },
+  replyBarTitle: { color: '#6C63FF', fontSize: 13, fontWeight: '700' },
+  replyBarSnippet: { fontSize: 12, marginTop: 1 },
   messageRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

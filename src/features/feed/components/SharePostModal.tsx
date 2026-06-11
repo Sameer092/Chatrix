@@ -19,6 +19,7 @@ import { chatService } from '../../../services/chat.service';
 import { useAuthStore } from '../../../store/authStore';
 import { useThemeStore } from '../../../store/themeStore';
 import { useDebounce } from '../../../hooks/useDebounce';
+import { isUserOnline } from '../../../utils/formatters';
 import { Avatar } from '../../../components/ui/Avatar';
 import { encodeSharedPost } from '../sharedPost';
 import type { Post, Profile } from '../../../types';
@@ -103,7 +104,7 @@ export const SharePostModal: React.FC<SharePostModalProps> = ({ visible, onClose
         onPress={() => toggle(item)}
         activeOpacity={0.7}
       >
-        <Avatar uri={item.avatar_url} name={item.name} size={46} isOnline={item.is_online} />
+        <Avatar uri={item.avatar_url} name={item.name} size={46} isOnline={isUserOnline(item.is_online, item.last_seen)} />
         <View style={styles.userInfo}>
           <Text style={[styles.name, { color: textColor }]}>{item.name}</Text>
           <Text style={[styles.username, { color: subtextColor }]}>@{item.username}</Text>

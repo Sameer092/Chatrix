@@ -18,7 +18,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { formatDistanceToNow } from '../../../utils/formatters';
+import { formatDistanceToNow, isUserOnline } from '../../../utils/formatters';
 import { Avatar } from '../../../components/ui/Avatar';
 import { SharePostModal } from './SharePostModal';
 import { useThemeStore } from '../../../store/themeStore';
@@ -127,7 +127,7 @@ export const PostCard = memo(({ post, onLike, onDelete }: PostCardProps) => {
             uri={post.author?.avatar_url}
             name={post.author?.name ?? ''}
             size={44}
-            isOnline={post.author?.is_online}
+            isOnline={isUserOnline(post.author?.is_online, post.author?.last_seen)}
           />
           <View style={styles.authorInfo}>
             <Text style={[styles.authorName, { color: textColor }]}>{post.author?.name}</Text>

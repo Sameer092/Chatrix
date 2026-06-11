@@ -4,12 +4,16 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
+  Dimensions,
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Alert,
+  Modal,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -23,9 +27,69 @@ import { notificationService } from '../../../services/notification.service';
 import { useAuthStore } from '../../../store/authStore';
 import { useThemeStore } from '../../../store/themeStore';
 import { Avatar } from '../../../components/ui/Avatar';
+import { SharePostModal } from '../components/SharePostModal';
 import { formatDistanceToNow } from '../../../utils/formatters';
 import type { Comment, Post } from '../../../types';
 import type { RootRouteProp, RootNavProp } from '../../../types/navigation.types';
+
+const SCREEN_W = Dimensions.get('window').width;
+const CAROUSEL_W = SCREEN_W - 32; // postCard horizontal padding (16 * 2)
+
+/** Swipeable carousel showing every image of the post, with page dots. */
+const PostImageCarousel = memo(function PostImageCarousel({ images }: { images: string[] }) {
+  const [idx, setIdx] = useState(0);
+  if (images.length === 1) {
+    return (
+      <Image source={{ uri: images[0] }} style={[carouselStyles.image, { marginTop: 14 }]} contentFit="cover" cachePolicy="memory-disk" />
+    );
+  }
+  return (
+    <View style={carouselStyles.wrap}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_W))}
+      >
+        {images.map((uri, i) => (
+          <Image
+            key={i}
+            source={{ uri }}
+            style={[carouselStyles.image, { width: CAROUSEL_W }]}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        ))}
+      </ScrollView>
+      <View style={carouselStyles.counter}>
+        <Text style={carouselStyles.counterText}>{idx + 1}/{images.length}</Text>
+      </View>
+      <View style={carouselStyles.dots}>
+        {images.map((_, i) => (
+          <View key={i} style={[carouselStyles.dot, i === idx && carouselStyles.dotActive]} />
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const carouselStyles = StyleSheet.create({
+  wrap: { marginTop: 14, position: 'relative' },
+  image: { width: CAROUSEL_W, height: 300, borderRadius: 14 },
+  counter: {
+    position: 'absolute',
+    top: 22,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  counterText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8', opacity: 0.5 },
+  dotActive: { backgroundColor: '#6C63FF', opacity: 1, width: 18 },
+});
 
 /**
  * Isolated composer: keeps the comment text in its OWN state so typing only
@@ -186,6 +250,66 @@ export default function PostDetailScreen() {
     },
   });
 
+  const isOwner = !!post && post.user_id === currentUser?.id;
+  const [showShare, setShowShare] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  const { mutate: deletePost } = useMutation({
+    mutationFn: () => postService.deletePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+      navigation.goBack();
+    },
+    onError: () => Alert.alert('Error', 'Could not delete the post.'),
+  });
+
+  const { mutate: saveEdit, isPending: savingEdit } = useMutation({
+    mutationFn: () => postService.updatePost(postId, { content: editText.trim() }),
+    onSuccess: () => {
+      setEditing(false);
+      refreshPostEverywhere();
+    },
+    onError: () => Alert.alert('Error', 'Could not update the post.'),
+  });
+
+  const openMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isOwner) {
+      Alert.alert('Post options', undefined, [
+        {
+          text: 'Edit post',
+          onPress: () => {
+            setEditText(post?.content ?? '');
+            setEditing(true);
+          },
+        },
+        { text: 'Share to friends', onPress: () => setShowShare(true) },
+        {
+          text: 'Delete post',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert('Delete Post', 'This cannot be undone. Delete this post?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => deletePost() },
+            ]),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } else {
+      Alert.alert('Post options', undefined, [
+        { text: 'Share to friends', onPress: () => setShowShare(true) },
+        {
+          text: 'Share via…',
+          onPress: () => Share.share({ message: post?.content || 'Check out this post on Chatrix' }),
+        },
+        { text: 'Report', onPress: () => Alert.alert('Reported', 'Thanks, we will review this post.') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
   const bgColor = isDark ? '#0F0F23' : '#F8F9FA';
   const cardBg = isDark ? '#1A1A3E' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#1E293B';
@@ -217,12 +341,7 @@ export default function PostDetailScreen() {
       ) : null}
 
       {post && post.image_urls.length > 0 && (
-        <Image
-          source={{ uri: post.image_urls[0] }}
-          style={styles.postImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-        />
+        <PostImageCarousel images={post.image_urls} />
       )}
 
       <View style={[styles.metaRow, { borderTopColor: borderColor }]}>
@@ -292,7 +411,9 @@ export default function PostDetailScreen() {
           <Ionicons name="chevron-back" size={26} color={textColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: textColor }]}>Post</Text>
-        <View style={{ width: 26 }} />
+        <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={textColor} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -319,12 +440,44 @@ export default function PostDetailScreen() {
         isDark={isDark}
         bottomInset={insets.bottom}
       />
+
+      {post && (
+        <SharePostModal visible={showShare} onClose={() => setShowShare(false)} post={post} />
+      )}
+
+      {/* Edit post (text) */}
+      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
+        <View style={[styles.container, { backgroundColor: bgColor }]}>
+          <View style={[styles.header, { paddingTop: 16, backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+            <TouchableOpacity onPress={() => setEditing(false)}>
+              <Text style={{ color: subtextColor, fontSize: 16 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: textColor }]}>Edit Post</Text>
+            <TouchableOpacity onPress={() => saveEdit()} disabled={savingEdit}>
+              <Text style={{ color: '#6C63FF', fontSize: 16, fontWeight: '700', opacity: savingEdit ? 0.5 : 1 }}>
+                {savingEdit ? 'Saving…' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={[styles.editInput, { color: textColor }]}
+            value={editText}
+            onChangeText={setEditText}
+            placeholder="What's on your mind?"
+            placeholderTextColor={subtextColor}
+            multiline
+            autoFocus
+            maxLength={500}
+          />
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  editInput: { fontSize: 18, lineHeight: 26, padding: 20, minHeight: 140, textAlignVertical: 'top' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

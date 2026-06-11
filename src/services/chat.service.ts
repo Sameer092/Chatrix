@@ -136,6 +136,14 @@ export const chatService = {
     if (error) throw error;
   },
 
+  async editMessage(messageId: string, content: string): Promise<void> {
+    const { error } = await supabase
+      .from('messages')
+      .update({ content })
+      .eq('id', messageId);
+    if (error) throw error;
+  },
+
   subscribeToMessages(
     conversationId: string,
     callback: (message: Message) => void

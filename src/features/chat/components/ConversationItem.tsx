@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../../../components/ui/Avatar';
 import { useThemeStore } from '../../../store/themeStore';
-import { formatDistanceToNow, formatTime } from '../../../utils/formatters';
-import { isSharedPostContent } from '../../feed/sharedPost';
+import { formatDistanceToNow, formatTime, isUserOnline } from '../../../utils/formatters';
+import { messageSnippet } from '../replyMessage';
 import type { Conversation } from '../../../types';
 
 interface ConversationItemProps {
@@ -26,14 +26,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const getPreview = () => {
     if (!lastMsg) return 'No messages yet';
-    if (lastMsg.is_deleted) return '🚫 Message deleted';
-    switch (lastMsg.message_type) {
-      case 'image': return '📷 Photo';
-      case 'voice': return '🎤 Voice note';
-      case 'file': return `📎 ${lastMsg.file_name ?? 'File'}`;
-      default:
-        return isSharedPostContent(lastMsg.content) ? '🔗 Shared a post' : (lastMsg.content ?? '');
-    }
+    return messageSnippet(lastMsg);
   };
 
   return (
@@ -46,7 +39,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         uri={other?.avatar_url}
         name={other?.name ?? ''}
         size={52}
-        isOnline={other?.is_online}
+        isOnline={isUserOnline(other?.is_online, other?.last_seen)}
       />
       <View style={styles.info}>
         <View style={styles.topRow}>

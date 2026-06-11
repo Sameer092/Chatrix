@@ -18,6 +18,7 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { useThemeStore } from '../../../store/themeStore';
 import { formatTime, formatDuration, formatFileSize } from '../../../utils/formatters';
 import { decodeSharedPost } from '../../feed/sharedPost';
+import { decodeReply } from '../replyMessage';
 import type { Message } from '../../../types';
 import type { RootNavProp } from '../../../types/navigation.types';
 
@@ -27,6 +28,8 @@ interface MessageBubbleProps {
   showAvatar?: boolean;
   /** Show the sender's name above the bubble (used in group chats). */
   showSenderName?: boolean;
+  /** Long-press handler (opens the reply/edit/delete menu). */
+  onLongPress?: () => void;
 }
 
 /** Self-contained voice-note player using expo-av. */
@@ -130,7 +133,7 @@ const VoicePlayer: React.FC<{ uri: string; duration: number | null; isMe: boolea
   );
 };
 
-export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }: MessageBubbleProps) => {
+export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName, onLongPress }: MessageBubbleProps) => {
   const isDark = useThemeStore((s) => s.isDark);
   const navigation = useNavigation<RootNavProp>();
 
@@ -170,6 +173,8 @@ export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }
 
   const shared =
     message.message_type === 'text' ? decodeSharedPost(message.content) : null;
+  const reply =
+    message.message_type === 'text' && !shared ? decodeReply(message.content) : null;
 
   const renderSharedPost = () => {
     if (!shared) return null;
@@ -193,9 +198,27 @@ export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }
             </Text>
           </View>
         </View>
-        {shared.image ? (
-          <Image source={{ uri: shared.image }} style={styles.sharedImage} contentFit="cover" cachePolicy="memory-disk" />
-        ) : null}
+        {(() => {
+          const imgs = shared.images?.length ? shared.images : shared.image ? [shared.image] : [];
+          if (imgs.length === 0) return null;
+          if (imgs.length === 1) {
+            return <Image source={{ uri: imgs[0] }} style={styles.sharedImage} contentFit="cover" cachePolicy="memory-disk" />;
+          }
+          // 2x2 grid so all shared images are visible without opening the post.
+          return (
+            <View style={styles.sharedGrid}>
+              {imgs.slice(0, 4).map((uri, i) => (
+                <Image
+                  key={i}
+                  source={{ uri }}
+                  style={styles.sharedGridImg}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ))}
+            </View>
+          );
+        })()}
         {shared.content ? (
           <Text style={[styles.sharedText, { color: cardText }]} numberOfLines={3}>
             {shared.content}
@@ -252,6 +275,34 @@ export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }
           </TouchableOpacity>
         );
       default:
+        if (reply) {
+          return (
+            <View>
+              <View
+                style={[
+                  styles.replyQuote,
+                  {
+                    backgroundColor: isMe ? 'rgba(255,255,255,0.18)' : isDark ? '#252550' : '#EEF0FF',
+                    borderLeftColor: isMe ? '#FFFFFF' : '#6C63FF',
+                  },
+                ]}
+              >
+                <Text style={[styles.replyQuoteSender, { color: isMe ? '#FFFFFF' : '#6C63FF' }]} numberOfLines={1}>
+                  {reply.toSender}
+                </Text>
+                <Text
+                  style={[styles.replyQuoteText, { color: isMe ? 'rgba(255,255,255,0.85)' : isDark ? '#94A3B8' : '#64748B' }]}
+                  numberOfLines={1}
+                >
+                  {reply.snippet}
+                </Text>
+              </View>
+              <Text style={[styles.textContent, { color: isMe ? '#FFFFFF' : isDark ? '#FFFFFF' : '#1E293B' }]}>
+                {reply.text}
+              </Text>
+            </View>
+          );
+        }
         return (
           <Text style={[styles.textContent, { color: isMe ? '#FFFFFF' : isDark ? '#FFFFFF' : '#1E293B' }]}>
             {message.content}
@@ -272,30 +323,37 @@ export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }
       ) : null}
 
       <View style={[styles.bubbleContainer, isMe ? styles.bubbleAlignRight : styles.bubbleAlignLeft]}>
-        {isMe ? (
-          <LinearGradient
-            colors={['#6C63FF', '#8579FF']}
-            style={[styles.bubble, styles.bubbleMe, isImage && styles.bubbleImage]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            {renderContent()}
-          </LinearGradient>
-        ) : (
-          <View
-            style={[
-              styles.bubble,
-              styles.bubbleOther,
-              isImage && styles.bubbleImage,
-              { backgroundColor: isDark ? '#1A1A3E' : '#FFFFFF' },
-            ]}
-          >
-            {showSenderName && message.sender?.name ? (
-              <Text style={styles.senderName}>{message.sender.name}</Text>
-            ) : null}
-            {renderContent()}
-          </View>
-        )}
+        <TouchableOpacity
+          activeOpacity={onLongPress ? 0.85 : 1}
+          onLongPress={onLongPress}
+          delayLongPress={250}
+          disabled={!onLongPress}
+        >
+          {isMe ? (
+            <LinearGradient
+              colors={['#6C63FF', '#8579FF']}
+              style={[styles.bubble, styles.bubbleMe, isImage && styles.bubbleImage]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              {renderContent()}
+            </LinearGradient>
+          ) : (
+            <View
+              style={[
+                styles.bubble,
+                styles.bubbleOther,
+                isImage && styles.bubbleImage,
+                { backgroundColor: isDark ? '#1A1A3E' : '#FFFFFF' },
+              ]}
+            >
+              {showSenderName && message.sender?.name ? (
+                <Text style={styles.senderName}>{message.sender.name}</Text>
+              ) : null}
+              {renderContent()}
+            </View>
+          )}
+        </TouchableOpacity>
         <Text style={[styles.timestamp, { textAlign: isMe ? 'right' : 'left' }]}>
           {formatTime(message.created_at)}
         </Text>
@@ -322,6 +380,15 @@ const styles = StyleSheet.create({
   bubbleMe: { borderBottomRightRadius: 4 },
   bubbleOther: { borderBottomLeftRadius: 4 },
   textContent: { fontSize: 15, lineHeight: 22 },
+  replyQuote: {
+    borderLeftWidth: 3,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginBottom: 6,
+  },
+  replyQuoteSender: { fontSize: 12, fontWeight: '700' },
+  replyQuoteText: { fontSize: 12, marginTop: 1 },
   senderName: { color: '#6C63FF', fontSize: 12, fontWeight: '700', marginBottom: 4 },
   timestamp: { fontSize: 11, marginTop: 4, color: '#64748B' },
   sharedCard: {
@@ -333,6 +400,8 @@ const styles = StyleSheet.create({
   sharedAuthor: { fontSize: 13, fontWeight: '700' },
   sharedUsername: { fontSize: 11, marginTop: 1 },
   sharedImage: { width: '100%', height: 150 },
+  sharedGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
+  sharedGridImg: { width: 119, height: 90 },
   sharedText: { fontSize: 13, lineHeight: 18, padding: 10 },
   sharedFooter: {
     flexDirection: 'row',

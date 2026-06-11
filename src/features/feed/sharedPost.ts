@@ -11,17 +11,20 @@ const PREFIX = 'CHATRIX_SHARED_POST::';
 export interface SharedPostPayload {
   id: string;
   content: string;
-  image: string | null;
+  image: string | null; // first image (kept for backward compatibility)
+  images: string[];      // all images
   authorName: string;
   authorUsername: string;
   authorAvatar: string | null;
 }
 
 export function encodeSharedPost(post: Post): string {
+  const images = (post.image_urls ?? []).slice(0, 4);
   const payload: SharedPostPayload = {
     id: post.id,
     content: (post.content ?? '').slice(0, 280),
-    image: post.image_urls?.[0] ?? null,
+    image: images[0] ?? null,
+    images,
     authorName: post.author?.name ?? '',
     authorUsername: post.author?.username ?? '',
     authorAvatar: post.author?.avatar_url ?? null,

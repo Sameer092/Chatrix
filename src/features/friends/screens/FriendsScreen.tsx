@@ -19,6 +19,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useThemeStore } from '../../../store/themeStore';
 import { Avatar } from '../../../components/ui/Avatar';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { isUserOnline } from '../../../utils/formatters';
 import type { FriendRequest, Friendship } from '../../../types';
 import type { RootNavProp } from '../../../types/navigation.types';
 
@@ -114,7 +115,7 @@ export default function FriendsScreen() {
                 onPress={() => friend?.id && navigation.navigate('UserProfile', { userId: friend.id })}
                 activeOpacity={0.7}
               >
-                <Avatar uri={friend?.avatar_url} name={friend?.name ?? ''} size={50} isOnline={friend?.is_online} />
+                <Avatar uri={friend?.avatar_url} name={friend?.name ?? ''} size={50} isOnline={isUserOnline(friend?.is_online, friend?.last_seen)} />
                 <View style={styles.friendInfo}>
                   <Text style={[styles.friendName, { color: textColor }]}>{friend?.name}</Text>
                   <Text style={[styles.friendUsername, { color: subtextColor }]}>@{friend?.username}</Text>

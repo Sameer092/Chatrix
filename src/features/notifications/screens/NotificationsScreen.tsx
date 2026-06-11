@@ -59,7 +59,7 @@ export default function NotificationsScreen() {
   const userId = useAuthStore((s) => s.user?.id);
   const navigation = useNavigation<RootNavProp>();
   const queryClient = useQueryClient();
-  const { markAllRead } = useNotificationStore();
+  const { markAllRead, markRead } = useNotificationStore();
 
   const { data: notifications, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['notifications', userId],
@@ -67,10 +67,25 @@ export default function NotificationsScreen() {
     enabled: !!userId,
   });
 
+  const markOneRead = (id: string) => {
+    // Optimistically flip the cached list so the unread dot clears instantly
+    // (the FlatList renders from this query cache, not the store).
+    queryClient.setQueryData<Notification[]>(['notifications', userId], (old) =>
+      (old ?? []).map((n) => (n.id === id ? { ...n, is_read: true } : n))
+    );
+    markRead(id); // decrements the tab badge count
+    notificationService.markAsRead(id); // persist to server
+  };
+
   const { mutate: markAllAsRead } = useMutation({
     mutationFn: () => notificationService.markAllAsRead(userId!),
-    onSuccess: () => {
+    onMutate: () => {
+      queryClient.setQueryData<Notification[]>(['notifications', userId], (old) =>
+        (old ?? []).map((n) => ({ ...n, is_read: true }))
+      );
       markAllRead();
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
@@ -95,13 +110,13 @@ export default function NotificationsScreen() {
         ]}
         activeOpacity={0.7}
         onPress={() => {
-          notificationService.markAsRead(item.id);
-          if (item.entity_type === 'post') {
-            // navigate to post
-          } else if (item.type === 'friend_request') {
+          if (!item.is_read) markOneRead(item.id);
+          if ((item.type === 'like' || item.type === 'comment') && item.entity_id) {
+            navigation.navigate('PostDetail', { postId: item.entity_id });
+          } else if (item.type === 'friend_request' || item.type === 'friend_accepted') {
             navigation.navigate('Friends');
-          } else if (item.type === 'message') {
-            // navigate to chat
+          } else if (item.actor?.id) {
+            navigation.navigate('UserProfile', { userId: item.actor.id });
           }
         }}
       >

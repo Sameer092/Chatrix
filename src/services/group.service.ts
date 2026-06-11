@@ -79,7 +79,7 @@ export const groupService = {
   async getGroupMembers(groupId: string): Promise<GroupMember[]> {
     const { data, error } = await supabase
       .from('group_members')
-      .select(`*, profile:profiles(id, username, name, avatar_url, is_online)`)
+      .select(`*, profile:profiles(id, username, name, avatar_url, is_online, last_seen)`)
       .eq('group_id', groupId);
     if (error) throw error;
     return data ?? [];
@@ -126,6 +126,22 @@ export const groupService = {
       .range(page * limit, (page + 1) * limit - 1);
     if (error) throw error;
     return (data ?? []).reverse();
+  },
+
+  async deleteGroupMessage(messageId: string): Promise<void> {
+    const { error } = await supabase
+      .from('group_messages')
+      .update({ is_deleted: true, content: null })
+      .eq('id', messageId);
+    if (error) throw error;
+  },
+
+  async editGroupMessage(messageId: string, content: string): Promise<void> {
+    const { error } = await supabase
+      .from('group_messages')
+      .update({ content })
+      .eq('id', messageId);
+    if (error) throw error;
   },
 
   async sendGroupMessage(params: {

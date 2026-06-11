@@ -13,7 +13,7 @@ export const postService = {
       .from('posts')
       .select(`
         *,
-        author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online)
+        author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online, last_seen)
       `)
       .order('created_at', { ascending: false })
       .range(page * Config.pagination.feedLimit, (page + 1) * Config.pagination.feedLimit - 1);
@@ -36,7 +36,7 @@ export const postService = {
   async getUserPosts(userId: string, page = 0): Promise<Post[]> {
     const { data, error } = await supabase
       .from('posts')
-      .select(`*, author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online)`)
+      .select(`*, author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online, last_seen)`)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(page * Config.pagination.feedLimit, (page + 1) * Config.pagination.feedLimit - 1);
@@ -47,7 +47,7 @@ export const postService = {
   async getPost(postId: string): Promise<Post> {
     const { data, error } = await supabase
       .from('posts')
-      .select(`*, author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online)`)
+      .select(`*, author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online, last_seen)`)
       .eq('id', postId)
       .single();
     if (error) throw error;
@@ -58,7 +58,7 @@ export const postService = {
     const { data, error } = await supabase
       .from('posts')
       .insert({ user_id: userId, content, image_urls: image_urls ?? [] })
-      .select(`*, author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online)`)
+      .select(`*, author:profiles!posts_user_id_fkey(id, username, name, avatar_url, is_online, last_seen)`)
       .single();
     if (error) throw error;
     return data;

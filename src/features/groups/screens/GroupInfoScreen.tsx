@@ -23,6 +23,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useThemeStore } from '../../../store/themeStore';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Button } from '../../../components/ui/Button';
+import { isUserOnline } from '../../../utils/formatters';
 import type { RootRouteProp, RootNavProp } from '../../../types/navigation.types';
 import type { GroupMember } from '../../../types';
 
@@ -119,7 +120,7 @@ export default function GroupInfoScreen() {
           uri={p?.avatar_url}
           name={p?.name ?? ''}
           size={44}
-          isOnline={p?.is_online}
+          isOnline={isUserOnline(p?.is_online, p?.last_seen)}
           onPress={() => p?.id && !isSelf && navigation.navigate('UserProfile', { userId: p.id })}
         />
         <View style={styles.memberInfo}>

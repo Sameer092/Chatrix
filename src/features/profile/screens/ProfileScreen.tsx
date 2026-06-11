@@ -158,6 +158,11 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                 )}
+                {post.image_urls.length > 1 && (
+                  <View style={styles.multiBadge}>
+                    <Ionicons name="copy" size={14} color="#FFFFFF" />
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -231,8 +236,9 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, marginVertical: 4 },
   gridContainer: { marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
-  gridItem: { width: IMAGE_SIZE, height: IMAGE_SIZE },
+  gridItem: { width: IMAGE_SIZE, height: IMAGE_SIZE, position: 'relative' },
   gridImage: { width: IMAGE_SIZE, height: IMAGE_SIZE },
+  multiBadge: { position: 'absolute', top: 6, right: 6 },
   textPostPreview: {
     padding: 8,
     alignItems: 'center',

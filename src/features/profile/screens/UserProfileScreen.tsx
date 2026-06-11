@@ -24,6 +24,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useThemeStore } from '../../../store/themeStore';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Button } from '../../../components/ui/Button';
+import { isUserOnline } from '../../../utils/formatters';
 import { PostCard } from '../../feed/components/PostCard';
 import type { RootRouteProp, RootNavProp } from '../../../types/navigation.types';
 
@@ -190,7 +191,7 @@ export default function UserProfileScreen() {
               uri={profile?.avatar_url}
               name={profile?.name ?? ''}
               size={84}
-              isOnline={profile?.is_online}
+              isOnline={isUserOnline(profile?.is_online, profile?.last_seen)}
               borderColor="#6C63FF"
               borderWidth={3}
             />
@@ -249,6 +250,11 @@ export default function UserProfileScreen() {
                 <Text style={[{ color: textColor, fontSize: 11, lineHeight: 15 }]} numberOfLines={5}>{post.content}</Text>
               </View>
             )}
+            {post.image_urls.length > 1 && (
+              <View style={styles.multiBadge}>
+                <Ionicons name="copy" size={14} color="#FFFFFF" />
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -302,6 +308,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, marginTop: 2 },
   statDivider: { width: 1, marginVertical: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, marginTop: 2 },
-  gridItem: { width: IMAGE_SIZE, height: IMAGE_SIZE },
+  gridItem: { width: IMAGE_SIZE, height: IMAGE_SIZE, position: 'relative' },
   gridImage: { width: IMAGE_SIZE, height: IMAGE_SIZE },
+  multiBadge: { position: 'absolute', top: 6, right: 6 },
 });
