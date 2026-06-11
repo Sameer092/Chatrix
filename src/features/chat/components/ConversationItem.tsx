@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../../../components/ui/Avatar';
 import { useThemeStore } from '../../../store/themeStore';
 import { formatDistanceToNow, formatTime } from '../../../utils/formatters';
+import { isSharedPostContent } from '../../feed/sharedPost';
 import type { Conversation } from '../../../types';
 
 interface ConversationItemProps {
@@ -30,7 +31,8 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
       case 'image': return '📷 Photo';
       case 'voice': return '🎤 Voice note';
       case 'file': return `📎 ${lastMsg.file_name ?? 'File'}`;
-      default: return lastMsg.content ?? '';
+      default:
+        return isSharedPostContent(lastMsg.content) ? '🔗 Shared a post' : (lastMsg.content ?? '');
     }
   };
 

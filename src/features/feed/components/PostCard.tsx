@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { formatDistanceToNow } from '../../../utils/formatters';
 import { Avatar } from '../../../components/ui/Avatar';
+import { SharePostModal } from './SharePostModal';
 import { useThemeStore } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/authStore';
 import type { Post } from '../../../types';
@@ -37,6 +38,8 @@ export const PostCard = memo(({ post, onLike, onDelete }: PostCardProps) => {
   const isDark = useThemeStore((s) => s.isDark);
   const currentUserId = useAuthStore((s) => s.user?.id);
   const navigation = useNavigation<RootNavProp>();
+
+  const [showShare, setShowShare] = useState(false);
 
   const heartScale = useSharedValue(1);
   const heartAnimStyle = useAnimatedStyle(() => ({
@@ -70,7 +73,9 @@ export const PostCard = memo(({ post, onLike, onDelete }: PostCardProps) => {
     });
   };
 
-  const handleShare = async () => {
+  const handleShareToFriends = () => setShowShare(true);
+
+  const handleExternalShare = async () => {
     try {
       await Share.share({
         message: post.content
@@ -86,7 +91,8 @@ export const PostCard = memo(({ post, onLike, onDelete }: PostCardProps) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isOwnPost) {
       Alert.alert('Post options', undefined, [
-        { text: 'Share', onPress: handleShare },
+        { text: 'Share to friends', onPress: handleShareToFriends },
+        { text: 'Share via…', onPress: handleExternalShare },
         {
           text: 'Delete Post',
           style: 'destructive',
@@ -100,7 +106,8 @@ export const PostCard = memo(({ post, onLike, onDelete }: PostCardProps) => {
       ]);
     } else {
       Alert.alert('Post options', undefined, [
-        { text: 'Share', onPress: handleShare },
+        { text: 'Share to friends', onPress: handleShareToFriends },
+        { text: 'Share via…', onPress: handleExternalShare },
         { text: 'Report', onPress: () => Alert.alert('Reported', 'Thanks, we will review this post.') },
         { text: 'Cancel', style: 'cancel' },
       ]);
@@ -198,10 +205,12 @@ export const PostCard = memo(({ post, onLike, onDelete }: PostCardProps) => {
           <Text style={[styles.actionText, { color: subtextColor }]}>{post.comments_count}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.action} onPress={handleShare}>
+        <TouchableOpacity style={styles.action} onPress={handleShareToFriends}>
           <Ionicons name="share-social-outline" size={22} color={subtextColor} />
         </TouchableOpacity>
       </View>
+
+      <SharePostModal visible={showShare} onClose={() => setShowShare(false)} post={post} />
     </View>
   );
 });

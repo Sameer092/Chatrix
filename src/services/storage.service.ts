@@ -2,6 +2,23 @@ import * as FileSystem from 'expo-file-system';
 import { supabase } from './supabase';
 import { Config } from '../constants/config';
 
+/** Normalizes a file extension to a valid MIME type. */
+function imageMimeFromUri(uri: string): { ext: string; mime: string } {
+  const raw = (uri.split('.').pop() ?? 'jpg').split('?')[0].toLowerCase();
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    heic: 'image/heic',
+    heif: 'image/heif',
+  };
+  // Default to jpeg — almost all picker output is jpeg, and an unknown
+  // extension with a bad MIME would be rejected by the bucket's allowlist.
+  return { ext: raw, mime: map[raw] ?? 'image/jpeg' };
+}
+
 export const storageService = {
   /**
    * Uploads a local file URI to Supabase Storage.
@@ -49,21 +66,21 @@ export const storageService = {
   },
 
   async uploadAvatar(userId: string, uri: string): Promise<string> {
-    const ext = uri.split('.').pop() ?? 'jpg';
+    const { ext, mime } = imageMimeFromUri(uri);
     const path = `${userId}/avatar.${ext}`;
-    return this.uploadFile(Config.storage.buckets.avatars, path, uri, `image/${ext}`);
+    return this.uploadFile(Config.storage.buckets.avatars, path, uri, mime);
   },
 
   async uploadCover(userId: string, uri: string): Promise<string> {
-    const ext = uri.split('.').pop() ?? 'jpg';
+    const { ext, mime } = imageMimeFromUri(uri);
     const path = `${userId}/cover.${ext}`;
-    return this.uploadFile(Config.storage.buckets.covers, path, uri, `image/${ext}`);
+    return this.uploadFile(Config.storage.buckets.covers, path, uri, mime);
   },
 
   async uploadPostImage(userId: string, postId: string, uri: string, index: number): Promise<string> {
-    const ext = uri.split('.').pop() ?? 'jpg';
+    const { ext, mime } = imageMimeFromUri(uri);
     const path = `${userId}/${postId}_${index}.${ext}`;
-    return this.uploadFile(Config.storage.buckets.posts, path, uri, `image/${ext}`);
+    return this.uploadFile(Config.storage.buckets.posts, path, uri, mime);
   },
 
   async uploadMessageFile(
@@ -82,9 +99,9 @@ export const storageService = {
   },
 
   async uploadGroupAvatar(groupId: string, uri: string): Promise<string> {
-    const ext = uri.split('.').pop() ?? 'jpg';
+    const { ext, mime } = imageMimeFromUri(uri);
     const path = `${groupId}/avatar.${ext}`;
-    return this.uploadFile(Config.storage.buckets.groups, path, uri, `image/${ext}`);
+    return this.uploadFile(Config.storage.buckets.groups, path, uri, mime);
   },
 
   getPublicUrl(bucket: string, path: string): string {

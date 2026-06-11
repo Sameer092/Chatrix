@@ -96,6 +96,16 @@ export const postService = {
     if (error) throw error;
   },
 
+  async checkPostLiked(postId: string, userId: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('post_likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    return !!data;
+  },
+
   async getComments(postId: string): Promise<Comment[]> {
     const { data, error } = await supabase
       .from('comments')

@@ -57,6 +57,10 @@ export default function ChatScreen() {
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) =>
       lastPage.length === 30 ? allPages.length : undefined,
+    // Always pull fresh messages when the chat opens (cached data could be
+    // missing a message that was added while the screen was closed).
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const messages = [...(data?.pages.flat() ?? []), ...localMessages];
@@ -218,7 +222,8 @@ export default function ChatScreen() {
         onEndReachedThreshold={0.2}
         contentContainerStyle={[styles.messagesList, { paddingBottom: 16 }]}
         showsVerticalScrollIndicator={false}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
       {typingUsers.length > 0 && (

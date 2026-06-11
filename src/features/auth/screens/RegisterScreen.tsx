@@ -51,11 +51,18 @@ export default function RegisterScreen() {
 
   const { mutate: signUp, isPending } = useMutation({
     mutationFn: authService.signUp,
-    onSuccess: (data) => {
-      // If email confirmation is enabled, no session is returned — tell the user.
-      // If confirmation is disabled, a session exists and the auth listener
-      // (useAuth) will switch to the Main stack automatically.
-      if (!data.session) {
+    onSuccess: async (data, variables) => {
+      // Case 1: a session was returned (email confirmation is OFF) → the auth
+      // listener in useAuth fires SIGNED_IN and the app switches to Main. Done.
+      if (data.session) return;
+
+      // Case 2: no session. Either confirmation is OFF but Supabase didn't
+      // auto-create a session, or confirmation is ON. Try to sign in right
+      // away — if it works, the listener takes us straight into the app.
+      try {
+        await authService.signIn({ email: variables.email, password: variables.password });
+      } catch {
+        // Sign-in failed → email confirmation is required.
         Alert.alert(
           'Verify your email',
           "We've sent a confirmation link to your email. Please verify your account, then sign in.",

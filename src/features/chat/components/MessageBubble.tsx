@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Avatar } from '../../../components/ui/Avatar';
 import { useThemeStore } from '../../../store/themeStore';
 import { formatTime, formatDuration, formatFileSize } from '../../../utils/formatters';
+import { decodeSharedPost } from '../../feed/sharedPost';
 import type { Message } from '../../../types';
 import type { RootNavProp } from '../../../types/navigation.types';
 
@@ -167,7 +168,49 @@ export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }
     }
   };
 
+  const shared =
+    message.message_type === 'text' ? decodeSharedPost(message.content) : null;
+
+  const renderSharedPost = () => {
+    if (!shared) return null;
+    const cardBg = isDark ? '#252550' : '#FFFFFF';
+    const cardText = isDark ? '#FFFFFF' : '#1E293B';
+    const cardSub = isDark ? '#94A3B8' : '#64748B';
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('PostDetail', { postId: shared.id })}
+        style={[styles.sharedCard, { backgroundColor: cardBg }]}
+      >
+        <View style={styles.sharedHeader}>
+          <Avatar uri={shared.authorAvatar} name={shared.authorName} size={26} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sharedAuthor, { color: cardText }]} numberOfLines={1}>
+              {shared.authorName}
+            </Text>
+            <Text style={[styles.sharedUsername, { color: cardSub }]} numberOfLines={1}>
+              @{shared.authorUsername}
+            </Text>
+          </View>
+        </View>
+        {shared.image ? (
+          <Image source={{ uri: shared.image }} style={styles.sharedImage} contentFit="cover" cachePolicy="memory-disk" />
+        ) : null}
+        {shared.content ? (
+          <Text style={[styles.sharedText, { color: cardText }]} numberOfLines={3}>
+            {shared.content}
+          </Text>
+        ) : null}
+        <View style={[styles.sharedFooter, { borderTopColor: isDark ? '#2D2D6B' : '#E2E8F0' }]}>
+          <Ionicons name="open-outline" size={13} color="#6C63FF" />
+          <Text style={styles.sharedFooterText}>View post</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderContent = () => {
+    if (shared) return renderSharedPost();
     switch (message.message_type) {
       case 'image':
         return (
@@ -217,8 +260,8 @@ export const MessageBubble = memo(({ message, isMe, showAvatar, showSenderName }
     }
   };
 
-  // Image bubbles look best without inner padding.
-  const isImage = message.message_type === 'image';
+  // Image bubbles and shared-post cards look best without inner padding.
+  const isImage = message.message_type === 'image' || !!shared;
 
   return (
     <View style={[styles.row, isMe ? styles.alignRight : styles.alignLeft]}>
@@ -281,6 +324,25 @@ const styles = StyleSheet.create({
   textContent: { fontSize: 15, lineHeight: 22 },
   senderName: { color: '#6C63FF', fontSize: 12, fontWeight: '700', marginBottom: 4 },
   timestamp: { fontSize: 11, marginTop: 4, color: '#64748B' },
+  sharedCard: {
+    width: 240,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  sharedHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10 },
+  sharedAuthor: { fontSize: 13, fontWeight: '700' },
+  sharedUsername: { fontSize: 11, marginTop: 1 },
+  sharedImage: { width: '100%', height: 150 },
+  sharedText: { fontSize: 13, lineHeight: 18, padding: 10 },
+  sharedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderTopWidth: 0.5,
+  },
+  sharedFooterText: { color: '#6C63FF', fontSize: 12, fontWeight: '600' },
   deletedBubble: {
     flexDirection: 'row',
     alignItems: 'center',

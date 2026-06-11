@@ -9,7 +9,6 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,7 +32,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const insets = useSafeAreaInsets();
   const isDark = useThemeStore((s) => s.isDark);
   const profile = useAuthStore((s) => s.profile);
   const userId = useAuthStore((s) => s.user?.id);
@@ -89,7 +87,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={[styles.container, { backgroundColor: bgColor }]}>
-        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.header, { paddingTop: 16 }]}>
           <TouchableOpacity onPress={onClose}>
             <Text style={[styles.cancelText, { color: '#94A3B8' }]}>Cancel</Text>
           </TouchableOpacity>
@@ -106,7 +104,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.authorRow}>
             <Avatar uri={profile?.avatar_url} name={profile?.name ?? ''} size={44} />
             <View style={styles.authorInfo}>
@@ -138,17 +140,23 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               ))}
             </ScrollView>
           )}
-        </ScrollView>
 
-        <View style={[styles.toolbar, { borderTopColor: isDark ? '#2D2D6B' : '#E2E8F0', paddingBottom: insets.bottom + 8 }]}>
-          <TouchableOpacity style={styles.toolbarBtn} onPress={pickImages}>
-            <Ionicons name="image-outline" size={26} color="#6C63FF" />
-            <Text style={styles.toolbarBtnText}>Photo</Text>
-          </TouchableOpacity>
-          <Text style={{ color: '#64748B', fontSize: 12 }}>
-            {content.length}/500
-          </Text>
-        </View>
+          {/* Add-photo action lives in the scroll content so it's always
+              reachable (KeyboardAvoidingView is unreliable inside a Modal). */}
+          <View style={styles.mediaRow}>
+            <TouchableOpacity
+              style={[styles.addPhotoBtn, { borderColor: '#6C63FF' }]}
+              onPress={pickImages}
+              disabled={images.length >= 4}
+            >
+              <Ionicons name="image-outline" size={22} color="#6C63FF" />
+              <Text style={styles.addPhotoText}>
+                {images.length > 0 ? `Photos (${images.length}/4)` : 'Add Photo'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#64748B', fontSize: 13 }}>{content.length}/500</Text>
+          </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -178,14 +186,20 @@ const styles = StyleSheet.create({
   imagePreviewContainer: { marginRight: 12, position: 'relative' },
   imagePreview: { width: 120, height: 120, borderRadius: 12 },
   removeImage: { position: 'absolute', top: -8, right: -8 },
-  toolbar: {
+  mediaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 0.5,
+    marginTop: 24,
   },
-  toolbarBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  toolbarBtnText: { color: '#6C63FF', fontWeight: '500' },
+  addPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  addPhotoText: { color: '#6C63FF', fontWeight: '600', fontSize: 14 },
 });

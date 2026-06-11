@@ -72,6 +72,8 @@ export default function GroupChatScreen() {
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) =>
       lastPage.length === 30 ? allPages.length : undefined,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const messages = [...(data?.pages.flat() ?? []), ...localMessages];
@@ -169,6 +171,8 @@ export default function GroupChatScreen() {
         onEndReachedThreshold={0.2}
         contentContainerStyle={[styles.messagesList, { paddingBottom: 16 }]}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
       <MessageInput

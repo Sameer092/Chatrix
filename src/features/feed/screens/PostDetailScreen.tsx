@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,64 @@ import { formatDistanceToNow } from '../../../utils/formatters';
 import type { Comment, Post } from '../../../types';
 import type { RootRouteProp, RootNavProp } from '../../../types/navigation.types';
 
+/**
+ * Isolated composer: keeps the comment text in its OWN state so typing only
+ * re-renders this small bar — not the parent screen / FlatList header. That
+ * stops the post card + avatars from re-mounting (and images from flickering)
+ * on every keystroke.
+ */
+const CommentComposer = memo(function CommentComposer({
+  onSend,
+  posting,
+  isDark,
+  bottomInset,
+}: {
+  onSend: (text: string) => void;
+  posting: boolean;
+  isDark: boolean;
+  bottomInset: number;
+}) {
+  const [text, setText] = useState('');
+
+  const cardBg = isDark ? '#1A1A3E' : '#FFFFFF';
+  const textColor = isDark ? '#FFFFFF' : '#1E293B';
+  const subtextColor = isDark ? '#94A3B8' : '#64748B';
+  const inputBg = isDark ? '#252550' : '#F1F5F9';
+  const borderColor = isDark ? '#2D2D6B' : '#E2E8F0';
+
+  const submit = () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setText('');
+    onSend(trimmed);
+  };
+
+  const disabled = posting || !text.trim();
+
+  return (
+    <View style={[styles.inputBar, { backgroundColor: cardBg, borderTopColor: borderColor, paddingBottom: bottomInset + 8 }]}>
+      <TextInput
+        style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
+        placeholder="Add a comment..."
+        placeholderTextColor={subtextColor}
+        value={text}
+        onChangeText={setText}
+        multiline
+        maxLength={500}
+        returnKeyType="send"
+        blurOnSubmit
+        onSubmitEditing={submit}
+      />
+      <TouchableOpacity onPress={submit} disabled={disabled}>
+        <View style={[styles.sendBtn, { opacity: disabled ? 0.5 : 1 }]}>
+          <Ionicons name="send" size={18} color="#FFFFFF" />
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
 export default function PostDetailScreen() {
   const route = useRoute<RootRouteProp<'PostDetail'>>();
   const navigation = useNavigation<RootNavProp>();
@@ -35,7 +93,6 @@ export default function PostDetailScreen() {
   const currentUser = useAuthStore((s) => s.user);
   const { postId } = route.params;
   const queryClient = useQueryClient();
-  const [commentText, setCommentText] = useState('');
 
   const { data: post } = useQuery({
     queryKey: ['post', postId],
@@ -45,6 +102,58 @@ export default function PostDetailScreen() {
   const { data: comments, isLoading: loadingComments } = useQuery({
     queryKey: ['comments', postId],
     queryFn: () => postService.getComments(postId),
+  });
+
+  const { data: liked } = useQuery({
+    queryKey: ['postLiked', postId, currentUser?.id],
+    queryFn: () => postService.checkPostLiked(postId, currentUser!.id),
+    enabled: !!currentUser?.id,
+  });
+
+  // Invalidate everything that shows this post's counts.
+  const refreshPostEverywhere = () => {
+    queryClient.invalidateQueries({ queryKey: ['post', postId] });
+    queryClient.invalidateQueries({ queryKey: ['feed'] });
+    queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+  };
+
+  const { mutate: toggleLike } = useMutation({
+    mutationFn: async () => {
+      if (!currentUser?.id) throw new Error('Not authenticated');
+      if (liked) {
+        await postService.unlikePost(postId, currentUser.id);
+      } else {
+        await postService.likePost(postId, currentUser.id);
+        if (post?.user_id && post.user_id !== currentUser.id) {
+          await notificationService.createNotification({
+            userId: post.user_id,
+            actorId: currentUser.id,
+            type: 'like',
+            entityId: postId,
+            entityType: 'post',
+          });
+        }
+      }
+    },
+    onMutate: async () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await queryClient.cancelQueries({ queryKey: ['post', postId] });
+      const prevPost = queryClient.getQueryData<Post>(['post', postId]);
+      const prevLiked = liked;
+      queryClient.setQueryData(['postLiked', postId, currentUser?.id], !prevLiked);
+      if (prevPost) {
+        queryClient.setQueryData(['post', postId], {
+          ...prevPost,
+          likes_count: prevPost.likes_count + (prevLiked ? -1 : 1),
+        });
+      }
+      return { prevPost, prevLiked };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prevPost) queryClient.setQueryData(['post', postId], ctx.prevPost);
+      queryClient.setQueryData(['postLiked', postId, currentUser?.id], ctx?.prevLiked);
+    },
+    onSettled: refreshPostEverywhere,
   });
 
   const { mutate: addComment, isPending: posting } = useMutation({
@@ -63,9 +172,8 @@ export default function PostDetailScreen() {
       return comment;
     },
     onSuccess: () => {
-      setCommentText('');
       queryClient.invalidateQueries({ queryKey: ['comments', postId] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      refreshPostEverywhere();
     },
     onError: () => Alert.alert('Error', 'Failed to post comment.'),
   });
@@ -74,25 +182,17 @@ export default function PostDetailScreen() {
     mutationFn: (commentId: string) => postService.deleteComment(commentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments', postId] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      refreshPostEverywhere();
     },
   });
-
-  const handleSend = () => {
-    const trimmed = commentText.trim();
-    if (!trimmed) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    addComment(trimmed);
-  };
 
   const bgColor = isDark ? '#0F0F23' : '#F8F9FA';
   const cardBg = isDark ? '#1A1A3E' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#1E293B';
   const subtextColor = isDark ? '#94A3B8' : '#64748B';
-  const inputBg = isDark ? '#252550' : '#F1F5F9';
   const borderColor = isDark ? '#2D2D6B' : '#E2E8F0';
 
-  const renderHeader = () => (
+  const renderHeader = useCallback(() => (
     <View style={[styles.postCard, { backgroundColor: cardBg }]}>
       <TouchableOpacity
         style={styles.authorRow}
@@ -126,19 +226,25 @@ export default function PostDetailScreen() {
       )}
 
       <View style={[styles.metaRow, { borderTopColor: borderColor }]}>
+        <TouchableOpacity style={styles.metaItem} onPress={() => toggleLike()} activeOpacity={0.7}>
+          <Ionicons
+            name={liked ? 'heart' : 'heart-outline'}
+            size={20}
+            color={liked ? '#EF4444' : subtextColor}
+          />
+          <Text style={[styles.metaText, { color: liked ? '#EF4444' : subtextColor }]}>
+            {post?.likes_count ?? 0}
+          </Text>
+        </TouchableOpacity>
         <View style={styles.metaItem}>
-          <Ionicons name="heart" size={16} color="#EF4444" />
-          <Text style={[styles.metaText, { color: subtextColor }]}>{post?.likes_count ?? 0}</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <Ionicons name="chatbubble" size={15} color="#6C63FF" />
+          <Ionicons name="chatbubble-outline" size={18} color="#6C63FF" />
           <Text style={[styles.metaText, { color: subtextColor }]}>{post?.comments_count ?? 0}</Text>
         </View>
       </View>
 
       <Text style={[styles.commentsHeading, { color: textColor }]}>Comments</Text>
     </View>
-  );
+  ), [post, liked, currentUser?.id, cardBg, textColor, subtextColor, borderColor, navigation, toggleLike]);
 
   const renderComment = ({ item }: { item: Comment }) => (
     <View style={[styles.commentRow, { backgroundColor: cardBg }]}>
@@ -207,22 +313,12 @@ export default function PostDetailScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      <View style={[styles.inputBar, { backgroundColor: cardBg, borderTopColor: borderColor, paddingBottom: insets.bottom + 8 }]}>
-        <TextInput
-          style={[styles.input, { backgroundColor: inputBg, color: textColor }]}
-          placeholder="Add a comment..."
-          placeholderTextColor={subtextColor}
-          value={commentText}
-          onChangeText={setCommentText}
-          multiline
-          maxLength={500}
-        />
-        <TouchableOpacity onPress={handleSend} disabled={posting || !commentText.trim()}>
-          <View style={[styles.sendBtn, { opacity: posting || !commentText.trim() ? 0.5 : 1 }]}>
-            <Ionicons name="send" size={18} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
-      </View>
+      <CommentComposer
+        onSend={addComment}
+        posting={posting}
+        isDark={isDark}
+        bottomInset={insets.bottom}
+      />
     </KeyboardAvoidingView>
   );
 }

@@ -258,8 +258,8 @@ export default function UserProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  coverContainer: { height: 160, position: 'relative' },
-  cover: { width: '100%', height: 160 },
+  coverContainer: { height: 200, position: 'relative' },
+  cover: { width: '100%', height: 200 },
   backBtn: {
     position: 'absolute',
     left: 16,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   profileSection: {
-    marginTop: -20,
+    marginTop: -24,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -277,7 +277,8 @@ const styles = StyleSheet.create({
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginTop: -44,
+    marginTop: -46,
+    marginBottom: 4,
   },
   avatarWrapper: {
     padding: 3,
